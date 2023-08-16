@@ -1,0 +1,99 @@
+name: Workflow from sources
+
+on:
+  push:
+
+jobs:
+  setup-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      ## Google Cloud
+      - name: Login to Google Cloud
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}'
+      - name: Get Google Cloud's Kubernetes credentials
+        uses: 'google-github-actions/get-gke-credentials@v1'
+        with:
+          cluster_name: 'mlops-workshop'
+          location: 'europe-west6-a'
+      ## CML
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Clone CML
+        uses: actions/checkout@v3
+        with:
+          repository: csia-pme/cml
+          ref: master
+          path: cml
+      - name: CML deps
+        run: |
+          pushd cml
+          npm ci
+          popd
+      - name: Hack CML for local TPI
+        run: |
+          pushd cml
+          sed -i "s/source: 'iterative\/iterative',/source: 'github.com\/iterative\/iterative',/g" src/terraform.js
+          sed -i "/...(tpiVersion && { version: tpiVersion })/d" src/terraform.js
+          popd
+      - name: Install CML
+        run: |
+          pushd cml
+          npm install -g .
+          popd
+      - name: Install misc CML tooling
+        run: |
+          npm install -g canvas@2 vega@5 vega-cli@5 vega-lite@5
+      ## TPI
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ^1.18.0
+      - name: Clone TPI
+        uses: actions/checkout@v3
+        with:
+          repository: csia-pme/terraform-provider-iterative
+          ref: main
+          path: tpi
+      - name: Build/Install TPI
+        run: |
+          pushd tpi
+          make build
+          make install-tpi
+      - name: Initialize runner on Kubernetes
+        env:
+          REPO_TOKEN: ${{ secrets.CML_PAT }}
+        run: |
+          export KUBERNETES_CONFIGURATION=$(cat $KUBECONFIG)
+          # https://cml.dev/doc/ref/runner
+          # https://registry.terraform.io/providers/iterative/iterative/latest/docs/resources/task#machine-type
+          # https://registry.terraform.io/providers/iterative/iterative/latest/docs/resources/task#{cpu}-{memory}
+          cml runner launch \
+            --labels="cml-runner-from-sources" \
+            --cloud="kubernetes" \
+            --cloud-type="s"
+
+  use-runner:
+    needs: setup-runner
+    runs-on: [self-hosted, cml-runner-from-sources]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      # Node is required to run CML
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      - name: Setup CML
+        uses: iterative/setup-cml@v1
+      - name: Create CML report
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "It's a success!" >> report.md
+          cml comment update --publish report.md
