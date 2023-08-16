@@ -67,3 +67,14 @@ file to replace the Terraform Provider Iterative repository you want to use:
               ref: <my tpi repository branch or ref>
               path: tpi
     ```
+
+You can check if the runner was successfully registered to GitHub with the
+following command:
+
+```sh
+curl -L \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer THE_CML_PAT" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    https://api.github.com/repos/USER/REPO/actions/runners
+```
