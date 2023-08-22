@@ -8,6 +8,8 @@ on:
 jobs:
   setup-runner:
     runs-on: ubuntu-latest
+    container:
+      image: docker://iterativeai/cml:0-dvc3-base1-gpu
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -21,13 +23,6 @@ jobs:
         with:
           cluster_name: 'mlops-workshop'
           location: 'europe-west6-a'
-      ## CML
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-      - name: Setup CML
-        uses: iterative/setup-cml@v1
       - name: Initialize runner on Kubernetes
         env:
           REPO_TOKEN: ${{ secrets.CML_PAT }}
@@ -39,7 +34,6 @@ jobs:
           cml runner launch \
             --labels="cml-runner-from-actions" \
             --cloud="kubernetes" \
-            --cloud-image="iterativeai/cml:0-dvc3-base1-gpu" \
             --cloud-type="1-2000" \
             --idle-timeout=1200 \
             --single
@@ -47,16 +41,12 @@ jobs:
   use-runner:
     needs: setup-runner
     runs-on: [self-hosted, cml-runner-from-actions]
+    container:
+      image: docker://iterativeai/cml:0-dvc3-base1-gpu
+      options: --gpus all
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      # Node is required to run CML
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-      - name: Setup CML
-        uses: iterative/setup-cml@v1
       - name: Create CML report
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
