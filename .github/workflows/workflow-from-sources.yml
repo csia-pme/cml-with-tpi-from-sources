@@ -2,6 +2,8 @@ name: Workflow from sources
 
 on:
   push:
+    paths:
+      - .github/workflows/workflow-from-sources.yml
 
 jobs:
   setup-runner:

@@ -2,6 +2,8 @@ name: Workflow from actions
 
 on:
   push:
+    paths:
+      - .github/workflows/workflow-from-actions.yml
 
 jobs:
   setup-runner:
@@ -37,7 +39,10 @@ jobs:
           cml runner launch \
             --labels="cml-runner-from-actions" \
             --cloud="kubernetes" \
-            --cloud-type="s"
+            --cloud-image="iterativeai/cml:0-dvc3-base1-gpu" \
+            --cloud-type="1-2000" \
+            --idle-timeout=1200 \
+            --single
 
   use-runner:
     needs: setup-runner
